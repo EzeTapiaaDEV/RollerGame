@@ -52,63 +52,55 @@ public class ControladorJugadorMovil : MonoBehaviour
     void Start()
     {
         posicionInicialJugador = transform.position;
-
+    
         if (camaraPrimeraPersona != null)
         {
-            Vector3 rot = camaraPrimeraPersona.transform.localRotation.eulerAngles;
+            Vector3 rot =
+                camaraPrimeraPersona.transform.localRotation.eulerAngles;
+    
             rotacionX = rot.x;
             rotacionY = rot.y;
         }
-
+    
         if (botonVerCartas != null)
             botonVerCartas.onClick.AddListener(ToggleMirarCartas);
-
+    
         if (botonDesconfiar != null)
             botonDesconfiar.onClick.AddListener(AccionDesconfiar);
-
-        // Guardamos todos los datos originales de la mesa de forma precisa
-        if (revolverPropio != null)
-        {
-            padreOriginalMesa = revolverPropio.transform.parent;
-            posicionOriginalMesa = revolverPropio.transform.position;
-            rotacionOriginalMesa = revolverPropio.transform.rotation;
-            escalaOriginalMesa = revolverPropio.transform.lossyScale; 
-        }
+    
+        GuardarDatosRevolver();
     }
 
     public void EquiparRevolverEnMano()
     {
-        if (revolverPropio != null && manoSocket != null)
+        if (revolverPropio == null || manoSocket == null)
         {
-            revolverPropio.transform.SetParent(manoSocket);
-            
-            revolverPropio.transform.localPosition = Vector3.zero;
-            revolverPropio.transform.localRotation = Quaternion.identity;
-            
-            if (manoSocket.lossyScale.x != 0 && manoSocket.lossyScale.y != 0 && manoSocket.lossyScale.z != 0)
-            {
-                revolverPropio.transform.localScale = new Vector3(
-                    escalaOriginalMesa.x / manoSocket.lossyScale.x,
-                    escalaOriginalMesa.y / manoSocket.lossyScale.y,
-                    escalaOriginalMesa.z / manoSocket.lossyScale.z
-                );
-            }
+            Debug.LogError("Falta el revólver o el manoSocket.");
+            return;
         }
+    
+        ActivarFisicaRevolver(false);
+    
+        revolverPropio.transform.SetParent(manoSocket, false);
+        revolverPropio.transform.localPosition = Vector3.zero;
+        revolverPropio.transform.localRotation = Quaternion.identity;
+        revolverPropio.transform.localScale = Vector3.one;
     }
 
     public void RegresarRevolverAMesa()
     {
-        // Devolvemos el revólver original a su posición y padre inicial en la mesa
-        if (revolverPropio != null)
+        if (revolverPropio == null)
         {
-            revolverPropio.transform.SetParent(padreOriginalMesa);
-            revolverPropio.transform.position = posicionOriginalMesa;
-            revolverPropio.transform.rotation = rotacionOriginalMesa;
-            revolverPropio.transform.localScale = escalaOriginalMesa;
-            
-            Collider col = revolverPropio.GetComponent<Collider>();
-            if (col != null) col.enabled = true;
+            Debug.LogError("No hay revólver que devolver a la mesa.");
+            return;
         }
+    
+        revolverPropio.transform.SetParent(padreOriginalMesa, true);
+        revolverPropio.transform.position = posicionOriginalMesa;
+        revolverPropio.transform.rotation = rotacionOriginalMesa;
+        revolverPropio.transform.localScale = escalaOriginalMesa;
+    
+        ActivarFisicaRevolver(true);
     }
 
     void Update()
@@ -316,21 +308,56 @@ public class ControladorJugadorMovil : MonoBehaviour
 
     public void PenalizarYTomarArma()
     {
-        // AQUÍ SÍ ACTIVAMOS EL EMPARENTAMIENTO DEL REVÓLVER A LA MANO
-        EquiparRevolverEnMano(); 
-
-        DetectorAgarre detector = revolverPropio.GetComponent<DetectorAgarre>();
-        if (detector != null)
+        if (revolverPropio == null)
         {
-            detector.esperandoAgarre = true;
+            Debug.LogError("No se puede coger el revólver porque es null.");
+            return;
         }
-
+    
+        EquiparRevolverEnMano();
+    
+        DetectorAgarre detector =
+            revolverPropio.GetComponent<DetectorAgarre>();
+    
+        if (detector != null)
+            detector.esperandoAgarre = true;
+    
         StartCoroutine(RutinaSoltarArma());
     }
 
-    IEnumerator RutinaSoltarArma()
+
+    private void ActivarFisicaRevolver(bool activar)
     {
-        yield return new WaitForSeconds(4.0f); 
-        RegresarRevolverAMesa();
+        if (revolverPropio == null) return;
+    
+        Rigidbody rb = revolverPropio.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = !activar;
+    
+            if (!activar)
+            {
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
+    
+        Collider[] colliders =
+            revolverPropio.GetComponentsInChildren<Collider>();
+    
+        foreach (Collider col in colliders)
+            col.enabled = activar;
+    }
+
+    private void GuardarDatosRevolver()
+    {
+        if (revolverPropio == null) return;
+    
+        padreOriginalMesa = revolverPropio.transform.parent;
+        posicionOriginalMesa = revolverPropio.transform.position;
+        rotacionOriginalMesa = revolverPropio.transform.rotation;
+    
+        // LocalScale, no LossyScale
+        escalaOriginalMesa = revolverPropio.transform.localScale;
     }
 }
